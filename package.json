@@ -1,0 +1,29 @@
+{
+  "name": "motivated",
+  "version": "1.0.0",
+  "description": "text pic of reddit r/getmotivated",
+  "main": "index.js",
+  "scripts": {
+    "test": "testcafe"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mwilde345/motivated.git"
+  },
+  "keywords": [
+    "getmotivated"
+  ],
+  "author": "matthew wilde",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mwilde345/motivated/issues"
+  },
+  "homepage": "https://github.com/mwilde345/motivated#readme",
+  "dependencies": {
+    "sls": "^0.1.0"
+  },
+  "devDependencies": {
+    "bent": "^7.3.12",
+    "form-urlencoded": "^4.2.1"
+  }
+}
