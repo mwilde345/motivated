@@ -23,7 +23,9 @@
     "sls": "^0.1.0"
   },
   "devDependencies": {
+    "aws-sdk": "^2.870.0",
     "bent": "^7.3.12",
-    "form-urlencoded": "^4.2.1"
+    "form-urlencoded": "^4.2.1",
+    "twilio": "^3.58.0"
   }
 }
