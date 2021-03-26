@@ -55,7 +55,6 @@ environment:
     TWILIO_ACC_ID: ${env:TWILIO_ACC_ID}
     TWILIO_AUTH: ${env:TWILIO_AUTH}
     TWILIO_NUMBER: ${env:TWILIO_NUMBER}
-    TWILIO_TO_NUMBER: ${env:TWILIO_TO_NUMBER}
 
 # you can add packaging information here
 #package:

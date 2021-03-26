@@ -2,12 +2,12 @@
 const { TwilioClient } = require("./client/twilioClient");
 const { RedditClient } = require("./client/redditClient");
 const { DynamoClient } = require("./client/dynamoClient");
+const { TWILIO_TO_NUMBERS } = require("./.config.js");
 
 const twilio = new TwilioClient();
 const reddit = new RedditClient();
 const dynamo = new DynamoClient();
 
-const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
 const REDDIT_POST_LIMIT = 5;
 const SUBREDDIT = "GetMotivated";
 const REDDIT_RETRY_COUNT = 3;
@@ -40,7 +40,7 @@ module.exports.handler = async (event) => {
     if (!newPostUrls.length) {
         console.log(`No new hot posts in r/${SUBREDDIT}`);
         await twilio.sendText(
-            TWILIO_TO_NUMBER,
+            TWILIO_TO_NUMBERS[0],
             `No new hot posts in r/${SUBREDDIT}`,
             null
         );
@@ -57,7 +57,10 @@ module.exports.handler = async (event) => {
         };
     }
     const hottestNewPost = newPostUrls[0];
-    await twilio.sendText(TWILIO_TO_NUMBER, null, hottestNewPost);
+
+    for (let number of TWILIO_TO_NUMBERS) {
+        await twilio.sendText(number, null, hottestNewPost);
+    }
     await dynamo.persistNewUrl(hottestNewPost);
 
     // let buffer = await getBuffer("http://site.com/image.png");
@@ -67,7 +70,7 @@ module.exports.handler = async (event) => {
         statusCode: 200,
         body: JSON.stringify(
             {
-                message: `Sent ${hottestNewPost} from r/${SUBREDDIT} to ${TWILIO_TO_NUMBER}`,
+                message: `Sent ${hottestNewPost} from r/${SUBREDDIT} to ${TWILIO_TO_NUMBERS}`,
                 input: event,
             },
             null,
