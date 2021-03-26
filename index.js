@@ -8,7 +8,7 @@ const twilio = new TwilioClient();
 const reddit = new RedditClient();
 const dynamo = new DynamoClient();
 
-const REDDIT_POST_LIMIT = 5;
+const REDDIT_POST_LIMIT = 10;
 const SUBREDDIT = "GetMotivated";
 const REDDIT_RETRY_COUNT = 3;
 
