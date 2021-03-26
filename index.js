@@ -8,9 +8,9 @@ const reddit = new RedditClient();
 const dynamo = new DynamoClient();
 
 const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
-const REDDIT_POST_LIMIT = 6;
+const REDDIT_POST_LIMIT = 5;
 const SUBREDDIT = "GetMotivated";
-const REDDIT_RETRY_COUNT = 0;
+const REDDIT_RETRY_COUNT = 3;
 
 module.exports.handler = async (event) => {
     await reddit.init();
