@@ -1,131 +1,64 @@
 "use strict";
-const bent = require("bent");
-const formurlencoded = require("form-urlencoded").default;
-const twilio = require("twilio");
-const AWS = require("aws-sdk");
+const { TwilioClient } = require("./client/twilioClient");
+const { RedditClient } = require("./client/redditClient");
+const { DynamoClient } = require("./client/dynamoClient");
 
-var accountSid = process.env.TWILIO_ACC_ID; // Your Account SID from www.twilio.com/console
-var authToken = process.env.TWILIO_AUTH; // Your Auth Token from www.twilio.com/console
-const twilioClient = new twilio(accountSid, authToken);
-const dynamo = new AWS.DynamoDB();
+const twilio = new TwilioClient();
+const reddit = new RedditClient();
+const dynamo = new DynamoClient();
+
+const TWILIO_TO_NUMBER = process.env.TWILIO_TO_NUMBER;
+const REDDIT_POST_LIMIT = 6;
+const SUBREDDIT = "GetMotivated";
+const REDDIT_RETRY_COUNT = 0;
 
 module.exports.handler = async (event) => {
-    const getJSON = bent("json");
-    const getBuffer = bent("buffer");
+    await reddit.init();
 
-    const post = bent(
-        200,
-        "POST",
-        "json",
-        {
-            Authorization: `Basic ${Buffer.from(
-                `${process.env.REDDIT_ID}:${process.env.REDDIT_SECRET}`
-            ).toString("base64")}`,
-            "User-Agent": "motivated:1.0 by miraclebob",
-        },
-        "https://www.reddit.com/api/v1/"
-    );
-    let params = formurlencoded({
-        grant_type: "password",
-        username: process.env.REDDIT_UNAME,
-        password: process.env.REDDIT_PWD,
-    });
-    const auth_token = (await post("access_token?" + params)).access_token;
-    console.log(auth_token);
+    let newPostUrls = [];
+    let retries = REDDIT_RETRY_COUNT;
+    let lastRecord = null;
+    do {
+        let {
+            validPostUrls,
+            lastRecordFromResponse,
+        } = await reddit.getHotPosts(
+            SUBREDDIT,
+            REDDIT_POST_LIMIT,
+            RedditClient.timeRanges.DAY,
+            lastRecord
+        );
+        lastRecord = lastRecordFromResponse;
 
-    const get = bent("https://oauth.reddit.com/", "GET", "json", 200, {
-        Authorization: `Bearer ${auth_token}`,
-        "User-Agent": "motivated:1.0 by miraclebob",
-    });
-    let subParams = formurlencoded({ limit: 3, t: "day" });
-    const response = await get("r/GetMotivated/hot?" + subParams);
-    let { after, children } = response.data;
-    console.log(children.length);
-    let validPostUrls = children
-        .filter((o) => {
-            return o.data.post_hint === "image" && o.data.is_self === false;
-        })
-        .map((o) => o.data.url);
-    console.log(validPostUrls);
-	console.log(validPostUrls.map((url) => ({
-		'file_url': { S: url },
-	})))
-    let getItemsParams = {
-        RequestItems: {
-            'MotivationDDBTable': {
-                ExpressionAttributeNames: {
-                    "#F": "file_url",
-                    "#T": "time_sent",
-                },
-                Keys: validPostUrls.map((url) => ({
-                    'file_url': { 'S': url },
-                })),
-                ProjectionExpression: "#F, #T",
-            },
-        },
-    };
+        let pastMessages = await dynamo.checkPastUrls(validPostUrls);
 
-	// var params = {
-	// 	RequestItems: {
-	// 	  'TABLE_NAME': {
-	// 		Keys: [
-	// 		  {'KEY_NAME': {N: 'KEY_VALUE_1'}},
-	// 		  {'KEY_NAME': {N: 'KEY_VALUE_2'}},
-	// 		  {'KEY_NAME': {N: 'KEY_VALUE_3'}}
-	// 		],
-	// 		ProjectionExpression: 'KEY_NAME, ATTRIBUTE'
-	// 	  }
-	// 	}
-	//   };
-
-    let alreadySentFiles = await new Promise((res, rej) => {
-        dynamo.batchGetItem(getItemsParams, (err, data) => {
-            if (err) {
-                console.log(err);
-                rej(err);
-            } else {
-				res(data.Responses.MotivationDDBTable);
-			}
+        newPostUrls = validPostUrls.filter((i) => {
+            return !pastMessages.includes(i);
         });
-    });
-    console.log('sent already: ', alreadySentFiles);
-	const leftover = validPostUrls.filter(i => {
-		return !(alreadySentFiles.map(o => o.file_url.S).includes(i))
-	});
-	console.log('leftover', leftover);
-    for (const url of leftover) {
-        await twilioClient.messages
-            .create({
-                to: "+14355925998", // Text this number
-                from: "+12067370668", // From a valid Twilio number
-                mediaUrl: url,
-            })
-            .then((message) => console.log(message.sid));
-        await new Promise((res, rej) => {
-            dynamo.putItem(
+        retries--;
+    } while (!newPostUrls.length && retries >= 0);
+    if (!newPostUrls.length) {
+        console.log(`No new hot posts in r/${SUBREDDIT}`);
+        await twilio.sendText(
+            TWILIO_TO_NUMBER,
+            `No new hot posts in r/${SUBREDDIT}`,
+            null
+        );
+        return {
+            statusCode: 200,
+            body: JSON.stringify(
                 {
-                    Item: {
-                        file_url: {
-                            S: url,
-                        },
-                        time_sent: {
-                            S: new Date().toString(),
-                        },
-                    },
-                    TableName: "MotivationDDBTable",
+                    message: `No new posts for today in r/${SUBREDDIT}`,
+                    input: event,
                 },
-                (err, data) => {
-                    if (err) {
-                        console.log(err);
-                        rej(err);
-                    } else {
-						console.log(`saved ${url} to db`);
-						res(data);
-					}
-                }
-            );
-        });
+                null,
+                2
+            ),
+        };
     }
+    const hottestNewPost = newPostUrls[0];
+    await twilio.sendText(TWILIO_TO_NUMBER, null, hottestNewPost);
+    await dynamo.persistNewUrl(hottestNewPost);
 
     // let buffer = await getBuffer("http://site.com/image.png");
     // let obj = await getJSON("http://site.com/json.api");
@@ -134,8 +67,7 @@ module.exports.handler = async (event) => {
         statusCode: 200,
         body: JSON.stringify(
             {
-                message:
-                    "Go Serverless v1.0! Your function executed successfully!",
+                message: `Sent ${hottestNewPost} from r/${SUBREDDIT} to ${TWILIO_TO_NUMBER}`,
                 input: event,
             },
             null,
