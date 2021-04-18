@@ -83,7 +83,7 @@ functions:
             #      - websocket: $connect
             #      - s3: ${env:BUCKET}
             # - schedule: rate(2 minutes)
-            #      - sns: greeter-topic
+            # - sns: motivation-textract
             #      - stream: arn:aws:dynamodb:region:XXXXXX:table/foo/stream/1970-01-01T00:00:00.000
             #      - alexaSkill: amzn1.ask.skill.xx-xx-xx-xx
             #      - alexaSmartHome: amzn1.ask.skill.xx-xx-xx-xx
@@ -127,3 +127,12 @@ resources:
                       KeyType: HASH
                 BillingMode: PAY_PER_REQUEST
                 TableName: MotivationDDBTable
+        TextractSNSTopic:
+            Type: AWS::SNS::Topic
+            Properties:
+                ContentBasedDeduplication: true
+                DisplayName: motivation-textract
+                FifoTopic: false
+                Subscription:
+                    - Subscription
+                TopicName: motivation-textract
