@@ -13,6 +13,8 @@ const SUBREDDIT = "GetMotivated";
 const REDDIT_RETRY_COUNT = 3;
 
 module.exports.handler = async (event) => {
+	return;
+	
     await reddit.init();
 
     let newPostUrls = [];
